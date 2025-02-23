@@ -2,6 +2,8 @@ import React from 'react'
 import Search from './components/Search.jsx'
 import { useEffect, useState } from 'react';
 import Spinner from './components/Spinner.jsx';
+import MovieCard from './components/MovieCard.jsx';
+import { useDebounce } from 'react-use';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -24,12 +26,23 @@ const App = () => {
 
   const [isLoading, setIsLoading] = useState(false);
 
+  const [debounceSearchTerm, setdebounceSearchTerm] = useState("");
+//install the dependencies using npm -i reaact-use
+  //Debounce the search term to prevent making too many API requests
+  //by waiting for the user to stop typing for 1 second
+  useDebounce(() => setdebounceSearchTerm(searchTerm), 1000, [searchTerm]);
+
   /**
    * Fetches a list of movies from the external API.
    * Uses the API base URL and authorization token set in the environment.
    * Handles any errors that occur during the fetch operation.
+   * 
+   * 
+
+This code fetches a list of movies from an external API, either by searching with a query or by retrieving popular movies. It handles errors, updates the UI with loading and error states, and sets the movie list in the component's state.
+   * 
    */
-  const fetchMovies = async () => {
+  const fetchMovies = async (query = '') => {
 
     setIsLoading(true);
     setErrorMessage('');
@@ -40,7 +53,7 @@ const App = () => {
      * Handles any errors that occur during the fetch operation.
      */
     try {
-      const endpoint = `${API_BASE_URL}/discover/movie?sort_by=popularity.desc`;
+      const endpoint = query ? `${API_BASE_URL}/search/movie?query=${query}` : `${API_BASE_URL}/discover/movie?sort_by=popularity.desc`;
 
       const response = await fetch(endpoint, API_OPTIONS);
 
@@ -68,9 +81,9 @@ const App = () => {
 
 
   useEffect(() => {
-    fetchMovies();
+    fetchMovies(debounceSearchTerm);
 
-  }, []);
+  }, [debounceSearchTerm]);
   return (
     <main>
       <div className="pattern" />
@@ -91,7 +104,7 @@ const App = () => {
           ) : (
             <ul>
               {movieList.map((movie) => (
-                <p key={movie.id} className="text-white">{movie.title}</p>
+                <MovieCard  key={movie.id} movie={movie}/>
               ))}
             </ul>
           )}
