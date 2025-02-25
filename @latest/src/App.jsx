@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Spinner from './components/Spinner.jsx';
 import MovieCard from './components/MovieCard.jsx';
 import { useDebounce } from 'react-use';
+import { getTrendingMovies, updateSearchCount } from './appwrite.js';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -18,16 +19,17 @@ const API_OPTIONS = {
 }
 
 const App = () => {
+  const [debounceSearchTerm, setdebounceSearchTerm] = useState("");
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [errorMessage, setErrorMessage] = useState('');
-
   const [movieList, setMovieList] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const [debounceSearchTerm, setdebounceSearchTerm] = useState("");
-//install the dependencies using npm -i reaact-use
+  const [trendingMovies, setTrendingMovies] = useState([]);
+
+
   //Debounce the search term to prevent making too many API requests
   //by waiting for the user to stop typing for 1 second
   useDebounce(() => setdebounceSearchTerm(searchTerm), 1000, [searchTerm]);
@@ -38,15 +40,17 @@ const App = () => {
    * Handles any errors that occur during the fetch operation.
    * 
    * 
-
-This code fetches a list of movies from an external API, either by searching with a query or by retrieving popular movies. It handles errors, updates the UI with loading and error states, and sets the movie list in the component's state.
+   * @param {string} query - The query string to pass to the API
+   * 
+   * 
+   * This code fetches a list of movies from an external API, either by searching with a query or by retrieving popular movies.
+   * It handles errors, updates the UI with loading and error states, and sets the movie list in the component's state.
    * 
    */
   const fetchMovies = async (query = '') => {
 
     setIsLoading(true);
     setErrorMessage('');
-
 
     /**
      * Fetches a list of movies from the external API.
@@ -68,7 +72,10 @@ This code fetches a list of movies from an external API, either by searching wit
         setMovieList([]);
         return;
       }
-      setMovieList(data.results || [])
+      setMovieList(data.results || []);
+      if (query && data.results.length > 0) {
+        await updateSearchCount(query, data.results[0]);
+      }
 
     } catch (error) {
       // Handle any errors that occur
@@ -79,23 +86,59 @@ This code fetches a list of movies from an external API, either by searching wit
     }
   }
 
+  const loadTrendingMovies = async () => {
+    try {
+      const movies = await getTrendingMovies();
 
+      setTrendingMovies(movies);
+    } catch (error) {
+      console.log(`Error featching movies: ${error}`);
+    }
+  }
+
+  /**
+   * Fetches a list of movies from the external API on mount, and when the search term changes
+   * 
+   * 
+   * This hook fetches a list of movies from an external API when the component mounts, and when the search term changes.
+   * It debounces the search term to prevent making too many API requests.
+   * 
+   */
   useEffect(() => {
     fetchMovies(debounceSearchTerm);
 
   }, [debounceSearchTerm]);
+
+  useEffect(() => {
+    loadTrendingMovies();
+  }, []);
   return (
     <main>
       <div className="pattern" />
       <div className="wrapper">
-        <header className="">
+        <header>
           <img src="./hero.png" alt="Heor Banner" />
           <h1>Find <span className="text-gradient">Movies</span>You'll Enjoy Without the Hassle</h1>
           <Search searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         </header>
 
+        {trendingMovies.length > 0 && (
+          <section className="trending">
+            <h2>Trending Movies</h2>
+
+            <ul>
+              {trendingMovies.map((movie, index) => (
+                <li key={movie.$id}>
+                  <p>{index + 1}</p>
+                  <img src={movie.poster_url} alt={movie.title} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section className="all-movies">
-          <h2 className='mt-[40px]'>All Movies</h2>
+          <h2>All Movies</h2>
 
           {isLoading ? (
             <p className='text-white'><Spinner /></p>
@@ -104,7 +147,7 @@ This code fetches a list of movies from an external API, either by searching wit
           ) : (
             <ul>
               {movieList.map((movie) => (
-                <MovieCard  key={movie.id} movie={movie}/>
+                <MovieCard key={movie.id} movie={movie} />
               ))}
             </ul>
           )}
